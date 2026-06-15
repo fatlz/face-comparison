@@ -606,7 +606,7 @@
     </div>
 
     <!-- Face-API Library -->
-    <script async src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js" onload="initAfterLibraryLoad()"></script>
 
     <script>
         // ============== CONFIGURATION ==============
@@ -657,27 +657,48 @@
         };
 
         // ============== INITIALIZATION ==============
+        function initAfterLibraryLoad() {
+            console.log('📚 Face-API library loaded');
+            init();
+        }
+
         async function init() {
             try {
                 showLoading(true);
                 showError('');
                 
-                // Load Face-API models
-                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
-                await Promise.all([
+                console.log('🔄 Memulai loading model AI...');
+
+                // Check if faceapi is available
+                if (typeof faceapi === 'undefined') {
+                    throw new Error('Face-API library tidak tersedia');
+                }
+
+                // Load Face-API models with correct URLs
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@0.0.11/model/';
+                
+                const loadPromise = Promise.all([
                     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
                     faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
                     faceapi.nets.faceDetectionNet.loadFromUri(MODEL_URL),
                     faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
                     faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL)
                 ]);
+
+                // Set timeout to prevent infinite loading (30 seconds)
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Model loading timeout - melebihi 30 detik')), 30000)
+                );
+
+                await Promise.race([loadPromise, timeoutPromise]);
                 
                 state.modelsLoaded = true;
-                console.log('✓ Models loaded successfully');
+                console.log('✅ Model AI berhasil dimuat');
                 showLoading(false);
             } catch (error) {
-                console.error('Error loading models:', error);
-                showError('Gagal memuat model AI. Silakan refresh halaman dan coba lagi.');
+                console.error('❌ Error loading models:', error);
+                const errorMsg = error.message || 'Gagal memuat model AI';
+                showError(`Gagal memuat model AI: ${errorMsg}. Silakan refresh halaman dan coba lagi.`);
                 showLoading(false);
             }
         }
@@ -998,27 +1019,44 @@
                 elements.conclusionBox.classList.remove('match');
                 elements.conclusionBox.classList.add('not-match');
                 conclusionHTML = `
-                    <h4>⚠️ AGAK BERBEDA - Tidak Pasti</h4>
-                    <p>Tingkat kemiripan ${similarity.percentage}% menunjukkan kesamaan yang sedang. 
-                    Ada beberapa fitur yang mirip namun juga ada perbedaan yang cukup signifikan. Disarankan untuk menggunakan foto yang lebih jelas 
-                    atau mencoba dengan foto lain untuk hasil yang lebih akurat.</p>
+                    <h4>⚠️ CUKUP MIRIP - Kemungkinan Berbeda</h4>
+                    <p>Tingkat kemiripan ${similarity.percentage}% menunjukkan kesamaan yang cukup antara kedua wajah, namun ada perbedaan 
+                    yang signifikan. Kemungkinan ini bukan orang yang sama, atau ada perubahan besar yang terjadi.</p>
                 `;
             } else {
                 elements.conclusionBox.classList.remove('match');
                 elements.conclusionBox.classList.add('not-match');
                 conclusionHTML = `
-                    <h4>✗ BERBEDA - Kemungkinan Orang Berbeda</h4>
-                    <p>Tingkat kemiripan ${similarity.percentage}% menunjukkan bahwa kedua wajah memiliki perbedaan yang signifikan. 
-                    Kemungkinan besar ini bukan wajah dari orang yang sama. Fitur-fitur wajah tidak cocok cukup baik untuk dianggap sebagai orang yang sama.</p>
+                    <h4>❌ TIDAK MIRIP - Berbeda Orang</h4>
+                    <p>Tingkat kemiripan ${similarity.percentage}% menunjukkan bahwa kedua wajah memiliki perbedaan yang sangat jelas. 
+                    Ini kemungkinan besar adalah wajah dari dua orang yang berbeda.</p>
                 `;
             }
 
-            elements.conclusionText.innerHTML = conclusionHTML;
+            elements.conclusionBox.innerHTML = conclusionHTML;
         }
 
         // ============== UTILITY FUNCTIONS ==============
+        function showLoading(show) {
+            if (show) {
+                elements.loadingSpinner.classList.add('active');
+            } else {
+                elements.loadingSpinner.classList.remove('active');
+            }
+        }
+
+        function showError(message) {
+            const element = elements.errorMessage;
+            if (message) {
+                element.textContent = message;
+                element.classList.add('show');
+            } else {
+                element.classList.remove('show');
+            }
+        }
+
         function updateCompareButtonState() {
-            elements.compareBtn.disabled = !state.image1 || !state.image2;
+            elements.compareBtn.disabled = !state.image1 || !state.image2 || !state.modelsLoaded;
         }
 
         function reset() {
@@ -1032,37 +1070,18 @@
                 modelsLoaded: state.modelsLoaded
             };
 
-            elements.imageInput1.value = '';
-            elements.imageInput2.value = '';
             elements.preview1.innerHTML = '';
             elements.preview2.innerHTML = '';
+            elements.imageInput1.value = '';
+            elements.imageInput2.value = '';
             elements.resultsSection.classList.remove('active');
             showError('');
             updateCompareButtonState();
         }
 
-        function showLoading(show) {
-            elements.loadingSpinner.classList.toggle('active', show);
-        }
-
-        function showError(message) {
-            if (message) {
-                elements.errorMessage.textContent = message;
-                elements.errorMessage.classList.add('show');
-            } else {
-                elements.errorMessage.classList.remove('show');
-            }
-        }
-
         function capitalizeFirst(str) {
             return str.charAt(0).toUpperCase() + str.slice(1);
         }
-
-        // ============== START APPLICATION ==============
-        window.addEventListener('load', () => {
-            console.log('🚀 Starting Face Comparison Application');
-            init();
-        });
     </script>
 </body>
 </html>
