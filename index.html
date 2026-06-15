@@ -715,7 +715,7 @@
         // ============== INITIALIZATION ==============
         async function waitForFaceAPI() {
             let attempts = 0;
-            const maxAttempts = 150; // 15 seconds with 100ms intervals
+            const maxAttempts = 300; // 30 seconds with 100ms intervals
 
             // Wait for faceapi global to be available
             while (typeof faceapi === 'undefined' && attempts < maxAttempts) {
@@ -724,7 +724,7 @@
             }
 
             if (typeof faceapi === 'undefined') {
-                throw new Error('Face-API library gagal dimuat setelah 15 detik');
+                throw new Error('Face-API library gagal dimuat setelah 30 detik');
             }
 
             console.log('✅ Face-API library ditemukan, menunggu nets...');
@@ -745,7 +745,7 @@
                 attempts++;
             }
 
-            throw new Error('Face-API nets tidak selesai diinisialisasi setelah 15 detik');
+            throw new Error('Face-API nets tidak selesai diinisialisasi setelah 30 detik');
         }
 
         async function init() {
@@ -998,104 +998,105 @@
             
             // Normalize distances to percentage (0-100)
             // Euclidean distance typically ranges from 0-1 for face descriptors
-            const euclideanSimilarity = Math.max(0, Math.min(100, 100 - (euclidean * 100)));
+            const euclideanPercentage = Math.max(0, Math.min(100, (1 - euclidean) * 100));
             
-            // Combine both metrics with weights
-            const combinedSimilarity = (euclideanSimilarity * 0.6) + (cosine * 40);
-            const percentage = Math.round(combinedSimilarity);
+            // Cosine similarity already ranges from -1 to 1, convert to 0-100
+            const cosinePercentage = ((cosine + 1) / 2) * 100;
+            
+            // Average both metrics
+            const similarity = (euclideanPercentage + cosinePercentage) / 2;
             
             return {
-                percentage: percentage,
+                similarity: similarity.toFixed(2),
+                percentage: Math.round(similarity),
                 euclidean: euclidean.toFixed(4),
                 cosine: cosine.toFixed(4),
-                match: percentage >= 60
+                match: similarity >= CONFIG.matchThreshold * 100
             };
         }
 
         function euclideanDistance(a, b) {
-            if (!a || !b || a.length !== b.length) return Infinity;
             let sum = 0;
             for (let i = 0; i < a.length; i++) {
-                sum += Math.pow(a[i] - b[i], 2);
+                const diff = a[i] - b[i];
+                sum += diff * diff;
             }
             return Math.sqrt(sum);
         }
 
         function cosineSimilarity(a, b) {
-            if (!a || !b || a.length !== b.length) return 0;
             let dotProduct = 0;
-            let magnitudeA = 0;
-            let magnitudeB = 0;
+            let normA = 0;
+            let normB = 0;
             
             for (let i = 0; i < a.length; i++) {
                 dotProduct += a[i] * b[i];
-                magnitudeA += a[i] * a[i];
-                magnitudeB += b[i] * b[i];
+                normA += a[i] * a[i];
+                normB += b[i] * b[i];
             }
             
-            magnitudeA = Math.sqrt(magnitudeA);
-            magnitudeB = Math.sqrt(magnitudeB);
-            
-            if (magnitudeA === 0 || magnitudeB === 0) return 0;
-            
-            const similarity = dotProduct / (magnitudeA * magnitudeB);
-            return Math.max(0, Math.min(100, (similarity + 1) * 50));
+            const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+            return denominator === 0 ? 0 : dotProduct / denominator;
         }
 
-        // ============== RESULTS DISPLAY ==============
+        // ============== DISPLAY RESULTS ==============
         function displayResults(similarity, detection1, detection2) {
-            elements.scorePercentage.textContent = similarity.percentage + '%';
-            elements.progressFill.style.width = similarity.percentage + '%';
+            // Update similarity score
+            elements.scorePercentage.textContent = `${similarity.percentage}%`;
+            elements.progressFill.style.width = `${similarity.percentage}%`;
             
+            // Update metrics
             elements.euclideanDistance.textContent = similarity.euclidean;
             elements.cosineSimilarity.textContent = similarity.cosine;
-            
             elements.faces1.textContent = state.detections1.length;
             elements.faces2.textContent = state.detections2.length;
-
-            // Display facial features for image 1
-            displayFacialFeatures(detection1, 'facialFeatures1');
             
-            // Display facial features for image 2
+            // Display facial features
+            displayFacialFeatures(detection1, 'facialFeatures1');
             displayFacialFeatures(detection2, 'facialFeatures2');
-
+            
+            // Update conclusion
             updateConclusion(similarity);
+            
+            // Show results
             elements.resultsSection.classList.add('active');
         }
 
         function displayFacialFeatures(detection, elementId) {
             const container = elements[elementId];
             container.innerHTML = '';
-
+            
             const features = {
-                'Ekspresi Marah': detection.expressions.angry,
-                'Ekspresi Jijik': detection.expressions.disgusted,
-                'Ekspresi Takut': detection.expressions.fearful,
-                'Ekspresi Senang': detection.expressions.happy,
-                'Ekspresi Netral': detection.expressions.neutral,
-                'Ekspresi Sedih': detection.expressions.sad,
-                'Ekspresi Terkejut': detection.expressions.surprised,
-                'Usia Perkiraan': Math.round(detection.age),
-                'Jenis Kelamin': detection.gender
+                'Ekspresi Wajah': detection.expressions,
+                'Usia': `${Math.round(detection.age)} tahun`,
+                'Jenis Kelamin': `${detection.gender} (${(detection.genderProbability * 100).toFixed(0)}%)`,
+                'Kepercayaan Deteksi': `${(detection.detection.score * 100).toFixed(1)}%`
             };
-
+            
+            // Display expressions
+            if (detection.expressions) {
+                Object.entries(detection.expressions).forEach(([expression, probability]) => {
+                    const div = document.createElement('div');
+                    div.className = 'detection-item';
+                    div.innerHTML = `
+                        <label>${expression.charAt(0).toUpperCase() + expression.slice(1)}</label>
+                        <div class="value">${(probability * 100).toFixed(1)}%</div>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+            
+            // Display other features
             Object.entries(features).forEach(([label, value]) => {
-                const item = document.createElement('div');
-                item.className = 'detection-item';
+                if (label === 'Ekspresi Wajah') return; // Skip expressions as we already did them
                 
-                if (typeof value === 'number' && value < 1) {
-                    item.innerHTML = `
-                        <label>${label}</label>
-                        <div class="value">${(value * 100).toFixed(1)}%</div>
-                    `;
-                } else {
-                    item.innerHTML = `
-                        <label>${label}</label>
-                        <div class="value">${value}</div>
-                    `;
-                }
-                
-                container.appendChild(item);
+                const div = document.createElement('div');
+                div.className = 'detection-item';
+                div.innerHTML = `
+                    <label>${label}</label>
+                    <div class="value">${value}</div>
+                `;
+                container.appendChild(div);
             });
         }
     </script>
