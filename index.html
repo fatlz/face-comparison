@@ -690,7 +690,7 @@
             } else {
                 conclusionBox.classList.remove('match');
                 conclusionBox.classList.add('not-match');
-                conclusionText.textContent = `Berdasarkan analisis AI, kedua wajah menunjukkan perbedaan yang signifikan dengan tingkat kesamaan hanya ${similarity.percentage}%. Kemungkinan kedua foto adalah orang yang berbeda atau perubahan wajah yang sangat dratis.`;
+                conclusionText.textContent = `Berdasarkan analisis AI, kedua wajah menunjukkan perbedaan yang signifikan dengan tingkat kesamaan hanya ${similarity.percentage}%. Kemungkinan kedua foto adalah orang yang berbeda.`;
             }
         }
 
@@ -715,32 +715,37 @@
         // ============== INITIALIZATION ==============
         async function waitForFaceAPI() {
             let attempts = 0;
-            const maxAttempts = 100; // 10 seconds with 100ms intervals
+            const maxAttempts = 150; // 15 seconds with 100ms intervals
 
+            // Wait for faceapi global to be available
             while (typeof faceapi === 'undefined' && attempts < maxAttempts) {
                 await new Promise(resolve => setTimeout(resolve, 100));
                 attempts++;
             }
 
             if (typeof faceapi === 'undefined') {
-                throw new Error('Face-API library gagal dimuat setelah 10 detik');
+                throw new Error('Face-API library gagal dimuat setelah 15 detik');
             }
 
-            // Verify that nets property exists
-            if (!faceapi.nets) {
-                throw new Error('Face-API nets property tidak tersedia');
+            console.log('✅ Face-API library ditemukan, menunggu nets...');
+
+            // Now wait for nets to be initialized
+            attempts = 0;
+            while (attempts < maxAttempts) {
+                if (faceapi.nets && 
+                    faceapi.nets.faceDetectionNet && 
+                    faceapi.nets.faceLandmark68Net &&
+                    faceapi.nets.faceRecognitionNet &&
+                    faceapi.nets.faceExpressionNet &&
+                    faceapi.nets.ageGenderNet) {
+                    console.log('✅ Semua nets tersedia');
+                    return true;
+                }
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
             }
 
-            // Verify critical nets exist
-            if (!faceapi.nets.faceDetectionNet || 
-                !faceapi.nets.faceLandmark68Net ||
-                !faceapi.nets.faceRecognitionNet ||
-                !faceapi.nets.faceExpressionNet ||
-                !faceapi.nets.ageGenderNet) {
-                throw new Error('Face-API tidak memiliki semua model yang diperlukan');
-            }
-
-            return true;
+            throw new Error('Face-API nets tidak selesai diinisialisasi setelah 15 detik');
         }
 
         async function init() {
@@ -997,109 +1002,101 @@
             
             // Combine both metrics with weights
             const combinedSimilarity = (euclideanSimilarity * 0.6) + (cosine * 40);
-
+            const percentage = Math.round(combinedSimilarity);
+            
             return {
-                percentage: Math.round(combinedSimilarity),
+                percentage: percentage,
                 euclidean: euclidean.toFixed(4),
-                cosine: cosine.toFixed(2),
-                match: combinedSimilarity >= CONFIG.matchThreshold * 100
+                cosine: cosine.toFixed(4),
+                match: percentage >= 60
             };
         }
 
-        function euclideanDistance(descriptor1, descriptor2) {
+        function euclideanDistance(a, b) {
+            if (!a || !b || a.length !== b.length) return Infinity;
             let sum = 0;
-            for (let i = 0; i < descriptor1.length; i++) {
-                const diff = descriptor1[i] - descriptor2[i];
-                sum += diff * diff;
+            for (let i = 0; i < a.length; i++) {
+                sum += Math.pow(a[i] - b[i], 2);
             }
             return Math.sqrt(sum);
         }
 
-        function cosineSimilarity(descriptor1, descriptor2) {
+        function cosineSimilarity(a, b) {
+            if (!a || !b || a.length !== b.length) return 0;
             let dotProduct = 0;
-            let magnitude1 = 0;
-            let magnitude2 = 0;
-
-            for (let i = 0; i < descriptor1.length; i++) {
-                dotProduct += descriptor1[i] * descriptor2[i];
-                magnitude1 += descriptor1[i] * descriptor1[i];
-                magnitude2 += descriptor2[i] * descriptor2[i];
+            let magnitudeA = 0;
+            let magnitudeB = 0;
+            
+            for (let i = 0; i < a.length; i++) {
+                dotProduct += a[i] * b[i];
+                magnitudeA += a[i] * a[i];
+                magnitudeB += b[i] * b[i];
             }
-
-            magnitude1 = Math.sqrt(magnitude1);
-            magnitude2 = Math.sqrt(magnitude2);
-
-            if (magnitude1 === 0 || magnitude2 === 0) {
-                return 0;
-            }
-
-            return (dotProduct / (magnitude1 * magnitude2)) * 100;
+            
+            magnitudeA = Math.sqrt(magnitudeA);
+            magnitudeB = Math.sqrt(magnitudeB);
+            
+            if (magnitudeA === 0 || magnitudeB === 0) return 0;
+            
+            const similarity = dotProduct / (magnitudeA * magnitudeB);
+            return Math.max(0, Math.min(100, (similarity + 1) * 50));
         }
 
-        // ============== DISPLAY RESULTS ==============
+        // ============== RESULTS DISPLAY ==============
         function displayResults(similarity, detection1, detection2) {
-            // Update score
-            elements.scorePercentage.textContent = `${similarity.percentage}%`;
-            elements.progressFill.style.width = `${similarity.percentage}%`;
-
-            // Update details
+            elements.scorePercentage.textContent = similarity.percentage + '%';
+            elements.progressFill.style.width = similarity.percentage + '%';
+            
             elements.euclideanDistance.textContent = similarity.euclidean;
             elements.cosineSimilarity.textContent = similarity.cosine;
+            
             elements.faces1.textContent = state.detections1.length;
             elements.faces2.textContent = state.detections2.length;
 
-            // Display facial features
+            // Display facial features for image 1
             displayFacialFeatures(detection1, 'facialFeatures1');
+            
+            // Display facial features for image 2
             displayFacialFeatures(detection2, 'facialFeatures2');
 
-            // Update conclusion
             updateConclusion(similarity);
-
-            // Show results
             elements.resultsSection.classList.add('active');
         }
 
         function displayFacialFeatures(detection, elementId) {
-            const element = document.getElementById(elementId);
-            const expr = detection.expressions;
-            const age = detection.age;
-            const gender = detection.gender;
+            const container = elements[elementId];
+            container.innerHTML = '';
 
-            let html = `
-                <div class="detection-item">
-                    <label>Usia (diperkirakan)</label>
-                    <div class="value">${Math.round(age)} tahun</div>
-                </div>
-                <div class="detection-item">
-                    <label>Jenis Kelamin</label>
-                    <div class="value">${gender}</div>
-                </div>
-            `;
+            const features = {
+                'Ekspresi Marah': detection.expressions.angry,
+                'Ekspresi Jijik': detection.expressions.disgusted,
+                'Ekspresi Takut': detection.expressions.fearful,
+                'Ekspresi Senang': detection.expressions.happy,
+                'Ekspresi Netral': detection.expressions.neutral,
+                'Ekspresi Sedih': detection.expressions.sad,
+                'Ekspresi Terkejut': detection.expressions.surprised,
+                'Usia Perkiraan': Math.round(detection.age),
+                'Jenis Kelamin': detection.gender
+            };
 
-            // Add expressions
-            if (expr) {
-                const topExpression = Object.entries(expr).sort((a, b) => b[1] - a[1])[0];
-                if (topExpression) {
-                    const [expressionType, confidence] = topExpression;
-                    const expressionLabel = {
-                        'neutral': 'Netral',
-                        'happy': 'Bahagia',
-                        'sad': 'Sedih',
-                        'angry': 'Marah',
-                        'fearful': 'Takut',
-                        'disgusted': 'Jijik',
-                        'surprised': 'Terkejut'
-                    };
-                    html += `
-                        <div class="detection-item">
-                            <label>Ekspresi Utama</label>
-                            <div class="value">${expressionLabel[expressionType] || expressionType} (${Math.round(confidence * 100)}%)</div>
-                        </div>
+            Object.entries(features).forEach(([label, value]) => {
+                const item = document.createElement('div');
+                item.className = 'detection-item';
+                
+                if (typeof value === 'number' && value < 1) {
+                    item.innerHTML = `
+                        <label>${label}</label>
+                        <div class="value">${(value * 100).toFixed(1)}%</div>
+                    `;
+                } else {
+                    item.innerHTML = `
+                        <label>${label}</label>
+                        <div class="value">${value}</div>
                     `;
                 }
-            }
-
-            element.innerHTML = html;
+                
+                container.appendChild(item);
+            });
         }
     </script>
 </body>
