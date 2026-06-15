@@ -150,6 +150,7 @@
             max-height: 300px;
             border-radius: 15px;
             box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            object-fit: contain; /* PERBAIKAN: Mencegah gambar terpotong/gepeng */
         }
 
         .remove-btn {
@@ -857,6 +858,7 @@
             showError('');
         }
 
+        // PERBAIKAN PADA FUNGSI DISPLAY IMAGE AGAR FOTO TIDAK TERPOTONG
         function displayImage(src, imageNum) {
             const preview = imageNum === 1 ? elements.preview1 : elements.preview2;
             const canvas = document.createElement('canvas');
@@ -864,17 +866,23 @@
             const img = new Image();
 
             img.onload = () => {
+                // 1. Sesuaikan ukuran canvas dengan resolusi asli gambar
                 canvas.width = img.width;
                 canvas.height = img.height;
+                
+                // 2. Gambar foto ke dalam canvas
                 ctx.drawImage(img, 0, 0);
 
+                // 3. Bersihkan area preview dan siapkan tombol silang (hapus)
                 preview.innerHTML = `
-                    <canvas id="canvas${imageNum}"></canvas>
                     <button class="remove-btn" onclick="removeImage(${imageNum})">×</button>
                 `;
                 
-                preview.querySelector(`canvas`).getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                // 4. Sisipkan canvas yang sudah jadi langsung ke UI
+                canvas.id = `canvas${imageNum}`;
+                preview.insertBefore(canvas, preview.firstChild);
 
+                // 5. Simpan state untuk AI
                 if (imageNum === 1) {
                     state.image1 = canvas;
                 } else {
