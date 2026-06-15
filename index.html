@@ -605,8 +605,8 @@
         </div>
     </div>
 
-    <!-- Face-API Library -->
-    <script async src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <!-- Face-API Library with correct version -->
+    <script async defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 
     <script>
         // ============== CONFIGURATION ==============
@@ -656,11 +656,66 @@
             conclusionText: document.getElementById('conclusionText')
         };
 
+        // ============== UTILITY FUNCTIONS ==============
+        function showLoading(show) {
+            if (show) {
+                elements.loadingSpinner.classList.add('active');
+            } else {
+                elements.loadingSpinner.classList.remove('active');
+            }
+        }
+
+        function showError(message) {
+            if (message) {
+                elements.errorMessage.textContent = message;
+                elements.errorMessage.classList.add('show');
+            } else {
+                elements.errorMessage.classList.remove('show');
+                elements.errorMessage.textContent = '';
+            }
+        }
+
+        function updateCompareButtonState() {
+            elements.compareBtn.disabled = !state.image1 || !state.image2;
+        }
+
+        function updateConclusion(similarity) {
+            const conclusionBox = elements.conclusionBox;
+            const conclusionText = elements.conclusionText;
+
+            if (similarity.match) {
+                conclusionBox.classList.remove('not-match');
+                conclusionBox.classList.add('match');
+                conclusionText.textContent = `Berdasarkan analisis AI, kedua wajah menunjukkan kemiripan yang tinggi dengan tingkat kesamaan ${similarity.percentage}%. Kemungkinan besar wajah pada kedua foto adalah orang yang sama.`;
+            } else {
+                conclusionBox.classList.remove('match');
+                conclusionBox.classList.add('not-match');
+                conclusionText.textContent = `Berdasarkan analisis AI, kedua wajah menunjukkan perbedaan yang signifikan dengan tingkat kesamaan hanya ${similarity.percentage}%. Kemungkinan kedua foto adalah orang yang berbeda atau perubahan wajah yang sangat dratis.`;
+            }
+        }
+
+        function reset() {
+            state.image1 = null;
+            state.image2 = null;
+            state.descriptor1 = null;
+            state.descriptor2 = null;
+            state.detections1 = null;
+            state.detections2 = null;
+
+            elements.preview1.innerHTML = '';
+            elements.preview2.innerHTML = '';
+            elements.imageInput1.value = '';
+            elements.imageInput2.value = '';
+            elements.resultsSection.classList.remove('active');
+            showError('');
+
+            updateCompareButtonState();
+        }
+
         // ============== INITIALIZATION ==============
-        // Wait for Face-API library to load and then initialize
         async function waitForFaceAPI() {
             let attempts = 0;
-            const maxAttempts = 50; // 5 seconds with 100ms intervals
+            const maxAttempts = 100; // 10 seconds with 100ms intervals
 
             while (typeof faceapi === 'undefined' && attempts < maxAttempts) {
                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -668,12 +723,21 @@
             }
 
             if (typeof faceapi === 'undefined') {
-                throw new Error('Face-API library gagal dimuat setelah 5 detik');
+                throw new Error('Face-API library gagal dimuat setelah 10 detik');
             }
 
             // Verify that nets property exists
             if (!faceapi.nets) {
                 throw new Error('Face-API nets property tidak tersedia');
+            }
+
+            // Verify critical nets exist
+            if (!faceapi.nets.faceDetectionNet || 
+                !faceapi.nets.faceLandmark68Net ||
+                !faceapi.nets.faceRecognitionNet ||
+                !faceapi.nets.faceExpressionNet ||
+                !faceapi.nets.ageGenderNet) {
+                throw new Error('Face-API tidak memiliki semua model yang diperlukan');
             }
 
             return true;
@@ -690,13 +754,15 @@
                 await waitForFaceAPI();
                 console.log('📚 Face-API library berhasil dimuat');
 
-                // Load Face-API models with correct URLs
-                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@0.0.11/model/';
+                // Load Face-API models using correct CDN URL
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
                 
+                console.log('📥 Loading models from:', MODEL_URL);
+
                 const loadPromise = Promise.all([
-                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
                     faceapi.nets.faceDetectionNet.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
                     faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
                     faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL)
                 ]);
@@ -710,7 +776,12 @@
                 
                 state.modelsLoaded = true;
                 console.log('✅ Model AI berhasil dimuat');
-                showLoading(false);
+                showError('✅ Model AI siap digunakan');
+                
+                setTimeout(() => {
+                    showLoading(false);
+                    showError('');
+                }, 1500);
             } catch (error) {
                 console.error('❌ Error loading models:', error);
                 const errorMsg = error.message || 'Gagal memuat model AI';
@@ -815,6 +886,10 @@
 
                 updateCompareButtonState();
                 showError('');
+            };
+
+            img.onerror = () => {
+                showError('Gagal memuat gambar. Silakan coba lagi.');
             };
 
             img.src = src;
@@ -1001,86 +1076,30 @@
                 </div>
             `;
 
-            // Add top expressions
-            const sortedExpr = Object.entries(expr)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 3);
-
-            sortedExpr.forEach(([expression, value]) => {
-                html += `
-                    <div class="detection-item">
-                        <label>${capitalizeFirst(expression)}</label>
-                        <div class="value">${(value * 100).toFixed(0)}%</div>
-                    </div>
-                `;
-            });
+            // Add expressions
+            if (expr) {
+                const topExpression = Object.entries(expr).sort((a, b) => b[1] - a[1])[0];
+                if (topExpression) {
+                    const [expressionType, confidence] = topExpression;
+                    const expressionLabel = {
+                        'neutral': 'Netral',
+                        'happy': 'Bahagia',
+                        'sad': 'Sedih',
+                        'angry': 'Marah',
+                        'fearful': 'Takut',
+                        'disgusted': 'Jijik',
+                        'surprised': 'Terkejut'
+                    };
+                    html += `
+                        <div class="detection-item">
+                            <label>Ekspresi Utama</label>
+                            <div class="value">${expressionLabel[expressionType] || expressionType} (${Math.round(confidence * 100)}%)</div>
+                        </div>
+                    `;
+                }
+            }
 
             element.innerHTML = html;
-        }
-
-        function updateConclusion(similarity) {
-            let conclusionHTML = '';
-
-            if (similarity.match) {
-                elements.conclusionBox.classList.add('match');
-                elements.conclusionBox.classList.remove('not-match');
-                elements.conclusionBox.querySelector('h4').textContent = '✅ Wajah Cocok';
-                elements.conclusionText.textContent = `Berdasarkan analisis AI, kedua wajah memiliki kesamaan yang tinggi (${similarity.percentage}%). Kemungkinan besar ini adalah orang yang sama dengan perubahan usia atau penampilan yang minimal.`;
-            } else {
-                elements.conclusionBox.classList.add('not-match');
-                elements.conclusionBox.classList.remove('match');
-                elements.conclusionBox.querySelector('h4').textContent = '❌ Wajah Tidak Cocok';
-                elements.conclusionText.textContent = `Berdasarkan analisis AI, kedua wajah memiliki perbedaan yang signifikan (${similarity.percentage}%). Kemungkinan ini adalah orang yang berbeda atau memiliki perubahan wajah yang sangat besar.`;
-            }
-        }
-
-        function showLoading(show) {
-            if (show) {
-                elements.loadingSpinner.classList.add('active');
-            } else {
-                elements.loadingSpinner.classList.remove('active');
-            }
-        }
-
-        function showError(message) {
-            if (message) {
-                elements.errorMessage.textContent = message;
-                elements.errorMessage.classList.add('show');
-            } else {
-                elements.errorMessage.classList.remove('show');
-            }
-        }
-
-        function updateCompareButtonState() {
-            if (state.image1 && state.image2) {
-                elements.compareBtn.disabled = false;
-            } else {
-                elements.compareBtn.disabled = true;
-            }
-        }
-
-        function capitalizeFirst(str) {
-            return str.charAt(0).toUpperCase() + str.slice(1);
-        }
-
-        function reset() {
-            state = {
-                image1: null,
-                image2: null,
-                descriptor1: null,
-                descriptor2: null,
-                detections1: null,
-                detections2: null,
-                modelsLoaded: state.modelsLoaded
-            };
-
-            elements.preview1.innerHTML = '';
-            elements.preview2.innerHTML = '';
-            elements.imageInput1.value = '';
-            elements.imageInput2.value = '';
-            elements.resultsSection.classList.remove('active');
-            showError('');
-            updateCompareButtonState();
         }
     </script>
 </body>
