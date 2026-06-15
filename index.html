@@ -606,7 +606,7 @@
     </div>
 
     <!-- Face-API Library -->
-    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js" onload="initAfterLibraryLoad()"></script>
+    <script async src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 
     <script>
         // ============== CONFIGURATION ==============
@@ -657,9 +657,26 @@
         };
 
         // ============== INITIALIZATION ==============
-        function initAfterLibraryLoad() {
-            console.log('📚 Face-API library loaded');
-            init();
+        // Wait for Face-API library to load and then initialize
+        async function waitForFaceAPI() {
+            let attempts = 0;
+            const maxAttempts = 50; // 5 seconds with 100ms intervals
+
+            while (typeof faceapi === 'undefined' && attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+
+            if (typeof faceapi === 'undefined') {
+                throw new Error('Face-API library gagal dimuat setelah 5 detik');
+            }
+
+            // Verify that nets property exists
+            if (!faceapi.nets) {
+                throw new Error('Face-API nets property tidak tersedia');
+            }
+
+            return true;
         }
 
         async function init() {
@@ -669,10 +686,9 @@
                 
                 console.log('🔄 Memulai loading model AI...');
 
-                // Check if faceapi is available
-                if (typeof faceapi === 'undefined') {
-                    throw new Error('Face-API library tidak tersedia');
-                }
+                // Wait for Face-API library to be available
+                await waitForFaceAPI();
+                console.log('📚 Face-API library berhasil dimuat');
 
                 // Load Face-API models with correct URLs
                 const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@0.0.11/model/';
@@ -701,6 +717,13 @@
                 showError(`Gagal memuat model AI: ${errorMsg}. Silakan refresh halaman dan coba lagi.`);
                 showLoading(false);
             }
+        }
+
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
         }
 
         // ============== EVENT LISTENERS ==============
@@ -998,45 +1021,19 @@
         function updateConclusion(similarity) {
             let conclusionHTML = '';
 
-            if (similarity.percentage >= 80) {
-                elements.conclusionBox.classList.remove('not-match');
+            if (similarity.match) {
                 elements.conclusionBox.classList.add('match');
-                conclusionHTML = `
-                    <h4>✅ SANGAT MIRIP - Kemungkinan Orang yang Sama</h4>
-                    <p>Tingkat kemiripan ${similarity.percentage}% menunjukkan bahwa kedua wajah memiliki kesamaan yang sangat tinggi. 
-                    Kemungkinan besar ini adalah wajah dari orang yang sama di waktu yang berbeda. Analisis fitur wajah mendukung kesimpulan ini.</p>
-                `;
-            } else if (similarity.percentage >= 60) {
                 elements.conclusionBox.classList.remove('not-match');
-                elements.conclusionBox.classList.add('match');
-                conclusionHTML = `
-                    <h4>✓ MIRIP - Mungkin Orang yang Sama</h4>
-                    <p>Tingkat kemiripan ${similarity.percentage}% menunjukkan kesamaan yang signifikan antara kedua wajah. 
-                    Kemungkinan ini adalah orang yang sama, meskipun ada beberapa perbedaan yang mungkin disebabkan oleh perubahan usia, 
-                    ekspresi, atau kondisi pencahayaan.</p>
-                `;
-            } else if (similarity.percentage >= 40) {
-                elements.conclusionBox.classList.remove('match');
-                elements.conclusionBox.classList.add('not-match');
-                conclusionHTML = `
-                    <h4>⚠️ CUKUP MIRIP - Kemungkinan Berbeda</h4>
-                    <p>Tingkat kemiripan ${similarity.percentage}% menunjukkan kesamaan yang cukup antara kedua wajah, namun ada perbedaan 
-                    yang signifikan. Kemungkinan ini bukan orang yang sama, atau ada perubahan besar yang terjadi.</p>
-                `;
+                elements.conclusionBox.querySelector('h4').textContent = '✅ Wajah Cocok';
+                elements.conclusionText.textContent = `Berdasarkan analisis AI, kedua wajah memiliki kesamaan yang tinggi (${similarity.percentage}%). Kemungkinan besar ini adalah orang yang sama dengan perubahan usia atau penampilan yang minimal.`;
             } else {
-                elements.conclusionBox.classList.remove('match');
                 elements.conclusionBox.classList.add('not-match');
-                conclusionHTML = `
-                    <h4>❌ TIDAK MIRIP - Berbeda Orang</h4>
-                    <p>Tingkat kemiripan ${similarity.percentage}% menunjukkan bahwa kedua wajah memiliki perbedaan yang sangat jelas. 
-                    Ini kemungkinan besar adalah wajah dari dua orang yang berbeda.</p>
-                `;
+                elements.conclusionBox.classList.remove('match');
+                elements.conclusionBox.querySelector('h4').textContent = '❌ Wajah Tidak Cocok';
+                elements.conclusionText.textContent = `Berdasarkan analisis AI, kedua wajah memiliki perbedaan yang signifikan (${similarity.percentage}%). Kemungkinan ini adalah orang yang berbeda atau memiliki perubahan wajah yang sangat besar.`;
             }
-
-            elements.conclusionBox.innerHTML = conclusionHTML;
         }
 
-        // ============== UTILITY FUNCTIONS ==============
         function showLoading(show) {
             if (show) {
                 elements.loadingSpinner.classList.add('active');
@@ -1046,17 +1043,24 @@
         }
 
         function showError(message) {
-            const element = elements.errorMessage;
             if (message) {
-                element.textContent = message;
-                element.classList.add('show');
+                elements.errorMessage.textContent = message;
+                elements.errorMessage.classList.add('show');
             } else {
-                element.classList.remove('show');
+                elements.errorMessage.classList.remove('show');
             }
         }
 
         function updateCompareButtonState() {
-            elements.compareBtn.disabled = !state.image1 || !state.image2 || !state.modelsLoaded;
+            if (state.image1 && state.image2) {
+                elements.compareBtn.disabled = false;
+            } else {
+                elements.compareBtn.disabled = true;
+            }
+        }
+
+        function capitalizeFirst(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
         }
 
         function reset() {
@@ -1077,10 +1081,6 @@
             elements.resultsSection.classList.remove('active');
             showError('');
             updateCompareButtonState();
-        }
-
-        function capitalizeFirst(str) {
-            return str.charAt(0).toUpperCase() + str.slice(1);
         }
     </script>
 </body>
