@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aplikasi Perbandingan Wajah - Face Recognition</title>
     <style>
+        /* Skema Warna Ocean & Glassmorphism */
+        :root {
+            --ocean-dark: #051024;
+            --ocean-light: #10223f;
+            --text-main: #ccd6f6;
+            --text-secondary: #8892b0;
+            --accent-color: #64ffda;
+            --glass-bg: rgba(10, 34, 63, 0.65);
+            --glass-inner: rgba(5, 16, 36, 0.4);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -13,14 +24,14 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            /* Menggunakan tema laut dalam agar visualisasi ikan kontras dan natural */
-            background: linear-gradient(135deg, #10223f 0%, #051024 100%);
+            background: linear-gradient(135deg, var(--ocean-light) 0%, var(--ocean-dark) 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
             overflow-x: hidden;
+            color: var(--text-main);
         }
 
         /* Canvas Background */
@@ -33,8 +44,12 @@
             z-index: -1;
         }
 
+        /* Container Utama dengan Efek Kaca Transparan */
         .container {
-            background: white;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
             max-width: 1200px;
@@ -58,14 +73,14 @@
 
         h1 {
             text-align: center;
-            color: #333;
+            color: #ffffff;
             margin-bottom: 10px;
             font-size: 2.5em;
         }
 
         .subtitle {
             text-align: center;
-            color: #666;
+            color: var(--text-secondary);
             margin-bottom: 40px;
             font-size: 1.1em;
         }
@@ -89,25 +104,26 @@
         }
 
         .image-box h3 {
-            color: #667eea;
+            color: var(--accent-color);
             margin-bottom: 15px;
             font-size: 1.3em;
         }
 
         .image-box p {
-            color: #999;
+            color: var(--text-secondary);
             font-size: 0.9em;
             margin-bottom: 15px;
         }
 
+        /* Area Dropzone Transparan */
         .upload-area {
-            border: 3px dashed #667eea;
+            border: 2px dashed var(--accent-color);
             border-radius: 15px;
             padding: 30px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
-            background: #f8f9ff;
+            background: rgba(255, 255, 255, 0.02);
             position: relative;
             min-height: 200px;
             display: flex;
@@ -117,15 +133,15 @@
         }
 
         .upload-area:hover {
-            background: #eff1ff;
-            border-color: #764ba2;
+            background: rgba(100, 255, 218, 0.08);
+            border-color: #ffffff;
             transform: translateY(-2px);
         }
 
         .upload-area.dragover {
-            background: #e8ebff;
-            border-color: #764ba2;
-            box-shadow: 0 0 15px rgba(102, 126, 234, 0.2);
+            background: rgba(100, 255, 218, 0.15);
+            border-color: #ffffff;
+            box-shadow: 0 0 15px rgba(100, 255, 218, 0.2);
         }
 
         .upload-area input[type="file"] {
@@ -138,13 +154,13 @@
         }
 
         .upload-area p {
-            color: #667eea;
+            color: var(--accent-color);
             font-weight: 600;
             margin-bottom: 8px;
         }
 
         .upload-area small {
-            color: #999;
+            color: var(--text-secondary);
         }
 
         .image-preview {
@@ -152,19 +168,13 @@
             margin-top: 20px;
         }
 
-        .image-preview img {
-            max-width: 100%;
-            max-height: 300px;
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-        }
-
         .image-preview canvas {
             max-width: 100%;
             max-height: 300px;
             border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
             object-fit: contain;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .remove-btn {
@@ -183,7 +193,7 @@
             align-items: center;
             justify-content: center;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         }
 
         .remove-btn:hover {
@@ -212,29 +222,32 @@
         }
 
         .btn-compare {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: linear-gradient(135deg, var(--accent-color) 0%, #0072ff 100%);
+            color: #051024;
             padding: 15px 40px;
             font-size: 1.1em;
         }
 
         .btn-compare:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 10px 25px rgba(100, 255, 218, 0.3);
         }
 
         .btn-compare:disabled {
-            opacity: 0.5;
+            opacity: 0.3;
             cursor: not-allowed;
+            color: #ffffff;
         }
 
         .btn-reset {
-            background: #e0e0e0;
-            color: #333;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .btn-reset:hover {
-            background: #d0d0d0;
+            background: rgba(255, 255, 255, 0.18);
+            color: #ffffff;
             transform: translateY(-2px);
         }
 
@@ -244,14 +257,8 @@
         }
 
         @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .results-section.active {
@@ -259,11 +266,12 @@
         }
 
         .result-card {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: 15px;
             padding: 30px;
             margin-bottom: 30px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
         }
 
         .similarity-score {
@@ -274,14 +282,14 @@
         .score-number {
             font-size: 3.5em;
             font-weight: bold;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--accent-color) 0%, #ffffff 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
 
         .score-label {
-            color: #666;
+            color: var(--text-secondary);
             font-size: 1.2em;
             margin-top: 10px;
         }
@@ -289,7 +297,7 @@
         .progress-bar {
             width: 100%;
             height: 12px;
-            background: #ddd;
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
             overflow: hidden;
             margin: 20px 0;
@@ -297,23 +305,24 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(90deg, var(--accent-color) 0%, #0072ff 100%);
             border-radius: 10px;
             transition: width 0.5s ease;
         }
 
         .result-details {
-            background: white;
+            background: var(--glass-inner);
             border-radius: 10px;
             padding: 20px;
             margin-top: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .detail-item {
             display: flex;
             justify-content: space-between;
             padding: 12px 0;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .detail-item:last-child {
@@ -321,33 +330,31 @@
         }
 
         .detail-label {
-            color: #666;
-            font-weight: 600;
+            color: var(--text-secondary);
         }
 
         .detail-value {
-            color: #333;
-            font-weight: 600;
-            font-size: 1.1em;
+            color: #ffffff;
         }
 
         .conclusion {
-            background: white;
-            border-left: 5px solid #667eea;
+            background: var(--glass-inner);
+            border-left: 5px solid var(--accent-color);
             border-radius: 10px;
             padding: 20px;
             margin-top: 20px;
             text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .conclusion.match {
             border-left-color: #2ed573;
-            background: #f0fef4;
+            background: rgba(46, 213, 115, 0.08);
         }
 
         .conclusion.not-match {
             border-left-color: #ff4757;
-            background: #fff5f5;
+            background: rgba(255, 71, 87, 0.08);
         }
 
         .conclusion h4 {
@@ -355,16 +362,10 @@
             margin-bottom: 10px;
         }
 
-        .conclusion.match h4 {
-            color: #2ed573;
-        }
-
-        .conclusion.not-match h4 {
-            color: #ff4757;
-        }
-
+        .conclusion.match h4 { color: #2ed573; }
+        .conclusion.not-match h4 { color: #ff4757; }
         .conclusion p {
-            color: #666;
+            color: var(--text-main);
             line-height: 1.6;
         }
 
@@ -379,8 +380,8 @@
         }
 
         .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid var(--accent-color);
             border-radius: 50%;
             width: 50px;
             height: 50px;
@@ -394,14 +395,14 @@
         }
 
         .loading-text {
-            color: #666;
+            color: var(--text-main);
             font-size: 1.1em;
             font-weight: 600;
         }
 
         .error-message {
-            background: #fff5f5;
-            border: 2px solid #ff4757;
+            background: rgba(255, 71, 87, 0.1);
+            border: 1px solid #ff4757;
             border-radius: 10px;
             padding: 20px;
             color: #ff4757;
@@ -416,16 +417,19 @@
         }
 
         .info-box {
-            background: #f0f7ff;
-            border-left: 5px solid #667eea;
+            background: rgba(100, 255, 218, 0.04);
+            border-left: 5px solid var(--accent-color);
             border-radius: 10px;
             padding: 20px;
             margin-bottom: 30px;
-            color: #333;
+            color: var(--text-main);
+            border-top: 1px solid rgba(255, 255, 255, 0.02);
+            border-right: 1px solid rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.02);
         }
 
         .info-box h4 {
-            color: #667eea;
+            color: var(--accent-color);
             margin-bottom: 10px;
         }
 
@@ -444,19 +448,20 @@
             content: "✓";
             position: absolute;
             left: 0;
-            color: #667eea;
+            color: var(--accent-color);
             font-weight: bold;
         }
 
         .face-detection-info {
-            background: white;
+            background: var(--glass-inner);
             border-radius: 10px;
             padding: 20px;
             margin-top: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .face-detection-info h5 {
-            color: #667eea;
+            color: var(--accent-color);
             margin-bottom: 15px;
         }
 
@@ -467,15 +472,15 @@
         }
 
         .detection-item {
-            background: #f8f9ff;
+            background: rgba(255, 255, 255, 0.02);
             border-radius: 10px;
             padding: 15px;
             text-align: center;
-            border: 1px solid #e0e0ff;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .detection-item label {
-            color: #667eea;
+            color: var(--text-secondary);
             font-weight: 600;
             font-size: 0.9em;
             display: block;
@@ -483,31 +488,17 @@
         }
 
         .detection-item .value {
-            color: #333;
+            color: #ffffff;
             font-weight: 600;
             font-size: 1.1em;
         }
 
         @media (max-width: 768px) {
-            .container {
-                padding: 20px;
-            }
-
-            h1 {
-                font-size: 1.8em;
-            }
-
-            .score-number {
-                font-size: 2.5em;
-            }
-
-            .button-group {
-                flex-direction: column;
-            }
-
-            button {
-                width: 100%;
-            }
+            .container { padding: 20px; }
+            h1 { font-size: 1.8em; }
+            .score-number { font-size: 2.5em; }
+            .button-group { flex-direction: column; }
+            button { width: 100%; }
         }
     </style>
 </head>
@@ -516,11 +507,11 @@
     <canvas id="aquariumCanvas"></canvas>
 
     <div class="container">
-        <h1>🔍 Perbandingan Wajah AI</h1>
+        <h1>🌊 Perbandingan Wajah AI</h1>
         <p class="subtitle">Analisis Kemiripan Wajah dengan Teknologi Machine Learning</p>
 
         <div class="info-box">
-            <h4>ℹ️ Cara Menggunakan:</h4>
+            <h4>🐚 Petunjuk Penyelaman:</h4>
             <ul>
                 <li>Unggah foto masa lalu (foto pertama)</li>
                 <li>Unggah foto sekarang (foto kedua)</li>
@@ -531,10 +522,10 @@
 
         <div class="upload-section">
             <div class="image-box">
-                <h3>📷 Foto Masa Lalu</h3>
+                <h3>⚓ Foto Masa Lalu</h3>
                 <p>Unggah foto masa kecil atau foto lama Anda</p>
                 <div class="upload-area" id="uploadArea1">
-                    <div class="upload-icon">📸</div>
+                    <div class="upload-icon">🤿</div>
                     <p>Klik atau Tarik Foto di Sini</p>
                     <small>Format: JPG, PNG | Max: 5MB</small>
                     <input type="file" id="imageInput1" accept="image/*">
@@ -543,10 +534,10 @@
             </div>
 
             <div class="image-box">
-                <h3>📷 Foto Sekarang</h3>
+                <h3>🐬 Foto Sekarang</h3>
                 <p>Unggah foto terkini Anda</p>
                 <div class="upload-area" id="uploadArea2">
-                    <div class="upload-icon">📷</div>
+                    <div class="upload-icon">🐠</div>
                     <p>Klik atau Tarik Foto di Sini</p>
                     <small>Format: JPG, PNG | Max: 5MB</small>
                     <input type="file" id="imageInput2" accept="image/*">
@@ -557,10 +548,10 @@
 
         <div class="button-group">
             <button class="btn-compare" id="compareBtn" disabled>
-                ⚖️ Bandingkan Wajah
+                🔱 Bandingkan Wajah
             </button>
             <button class="btn-reset" id="resetBtn">
-                🔄 Reset
+                🌊 Arus Balik (Reset)
             </button>
         </div>
 
@@ -568,7 +559,7 @@
 
         <div class="loading" id="loadingSpinner">
             <div class="spinner"></div>
-            <p class="loading-text">Menganalisis wajah... Mohon tunggu</p>
+            <p class="loading-text">Mengeksplorasi struktur wajah... Mohon tunggu</p>
         </div>
 
         <div class="results-section" id="resultsSection">
@@ -601,17 +592,17 @@
                 </div>
 
                 <div class="face-detection-info">
-                    <h5>📊 Analisis Fitur Wajah (Foto 1):</h5>
+                    <h5>🐠 Analisis Kedalaman Fitur (Foto 1):</h5>
                     <div class="detection-grid" id="facialFeatures1"></div>
                 </div>
 
                 <div class="face-detection-info">
-                    <h5>📊 Analisis Fitur Wajah (Foto 2):</h5>
+                    <h5>🐡 Analisis Kedalaman Fitur (Foto 2):</h5>
                     <div class="detection-grid" id="facialFeatures2"></div>
                 </div>
 
                 <div class="conclusion" id="conclusionBox">
-                    <h4>📋 Kesimpulan</h4>
+                    <h4>📜 Kesimpulan Kedalaman</h4>
                     <p id="conclusionText">-</p>
                 </div>
             </div>
@@ -784,7 +775,7 @@
                 
                 state.modelsLoaded = true;
                 console.log('✅ Model AI berhasil dimuat');
-                showError('✅ Model AI siap digunakan');
+                showError('🤿 Model Arsitektur AI Siap Digunakan');
                 
                 setTimeout(() => {
                     showLoading(false);
@@ -1097,11 +1088,8 @@
         window.addEventListener('resize', resizeAquariumCanvas);
         resizeAquariumCanvas();
 
-        // --- Class Gelembung ---
         class Bubble {
-            constructor() {
-                this.reset(true);
-            }
+            constructor() { this.reset(true); }
             reset(randomY = false) {
                 this.size = Math.random() * 5 + 1;
                 this.x = Math.random() * aqWidth;
@@ -1121,27 +1109,21 @@
             draw() {
                 aqCtx.save();
                 aqCtx.translate(this.x, this.y);
-                
                 aqCtx.beginPath();
                 aqCtx.arc(0, 0, this.size, 0, Math.PI * 2);
                 aqCtx.strokeStyle = `rgba(255, 255, 255, ${this.opacity})`;
                 aqCtx.lineWidth = 1;
                 aqCtx.stroke();
-
                 aqCtx.beginPath();
                 aqCtx.arc(-this.size * 0.3, -this.size * 0.3, this.size * 0.25, 0, Math.PI * 2);
                 aqCtx.fillStyle = `rgba(255, 255, 255, ${this.opacity * 2})`;
                 aqCtx.fill();
-                
                 aqCtx.restore();
             }
         }
 
-        // --- Class Ikan ---
         class Fish {
-            constructor() {
-                this.reset();
-            }
+            constructor() { this.reset(); }
             reset() {
                 this.x = Math.random() > 0.5 ? -100 : aqWidth + 100;
                 this.y = Math.random() * (aqHeight * 0.8) + (aqHeight * 0.1);
@@ -1149,7 +1131,6 @@
                 this.bodyLength = Math.random() * 1.8 + 1.2; 
                 this.speed = Math.random() * 1.2 + 0.4;
                 this.direction = this.x < 0 ? 1 : -1;
-                
                 const palettes = [
                     ['#ff7e5f', '#feb47b'],
                     ['#00c6ff', '#0072ff'],
@@ -1166,7 +1147,6 @@
                 this.x += this.speed * this.direction;
                 this.y += Math.sin(Date.now() * 0.001 + this.offsetY) * 0.4;
                 this.tailAngle += this.tailSpeed;
-
                 if ((this.direction === 1 && this.x > aqWidth + 150) || 
                     (this.direction === -1 && this.x < -150)) {
                     this.reset();
@@ -1176,24 +1156,19 @@
                 aqCtx.save();
                 aqCtx.translate(this.x, this.y);
                 if (this.direction === -1) aqCtx.scale(-1, 1);
-
                 const tailWag = Math.sin(this.tailAngle) * 0.4;
-
                 let grad = aqCtx.createLinearGradient(-this.size * this.bodyLength, 0, this.size * this.bodyLength, 0);
                 grad.addColorStop(0, this.colors[1]);
                 grad.addColorStop(1, this.colors[0]);
                 aqCtx.fillStyle = grad;
-
                 aqCtx.beginPath();
                 aqCtx.moveTo(0, -this.size * 0.5);
                 aqCtx.quadraticCurveTo(-this.size * 0.5, -this.size * 1.5, -this.size * 1.2, -this.size * 0.2);
                 aqCtx.fill();
-
                 aqCtx.beginPath();
                 aqCtx.moveTo(0, this.size * 0.5);
                 aqCtx.quadraticCurveTo(-this.size * 0.5, this.size * 1.2, -this.size * 0.8, this.size * 0.2);
                 aqCtx.fill();
-
                 aqCtx.save();
                 aqCtx.translate(-this.size * this.bodyLength + 2, 0);
                 aqCtx.rotate(tailWag);
@@ -1205,47 +1180,31 @@
                 aqCtx.closePath();
                 aqCtx.fill();
                 aqCtx.restore();
-
                 aqCtx.beginPath();
                 aqCtx.ellipse(0, 0, this.size * this.bodyLength, this.size * 0.7, 0, 0, Math.PI * 2);
                 aqCtx.fill();
-
                 aqCtx.fillStyle = 'white';
                 aqCtx.beginPath();
                 aqCtx.arc(this.size * (this.bodyLength * 0.6), -this.size * 0.15, this.size * 0.2, 0, Math.PI * 2);
                 aqCtx.fill();
-                
                 aqCtx.fillStyle = '#051024';
                 aqCtx.beginPath();
                 aqCtx.arc(this.size * (this.bodyLength * 0.6) + 1, -this.size * 0.15, this.size * 0.1, 0, Math.PI * 2);
                 aqCtx.fill();
-
                 aqCtx.restore();
             }
         }
 
-        // Inisialisasi Objek Akuarium
         for (let i = 0; i < 50; i++) bubbles.push(new Bubble());
         for (let i = 0; i < 12; i++) fishes.push(new Fish());
 
-        // Loop Animasi Grafis Akuarium
         function animateAquarium() {
             aqCtx.clearRect(0, 0, aqWidth, aqHeight);
-
-            bubbles.forEach(bubble => {
-                bubble.update();
-                bubble.draw();
-            });
-
+            bubbles.forEach(bubble => { bubble.update(); bubble.draw(); });
             fishes.sort((a, b) => a.size - b.size);
-            fishes.forEach(fish => {
-                fish.update();
-                fish.draw();
-            });
-
+            fishes.forEach(fish => { fish.update(); fish.draw(); });
             requestAnimationFrame(animateAquarium);
         }
-
         animateAquarium();
     </script>
 </body>
